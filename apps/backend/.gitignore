@@ -1,0 +1,6 @@
+# Backend-local ignores. Root .gitignore contains the shared monorepo rules.
+dist/
+node_modules/
+.env
+.env.local
+*.tsbuildinfo

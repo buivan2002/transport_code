@@ -1,0 +1,18 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: transport-express-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-4002}:4002"
+    env_file:
+      - ./backend.env
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: transport-express-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-4000}:3000"
+    depends_on:
+      - backend

@@ -1,0 +1,7 @@
+# Frontend-local ignores. Root .gitignore contains the shared monorepo rules.
+.next/
+out/
+node_modules/
+.env
+.env.local
+*.tsbuildinfo
