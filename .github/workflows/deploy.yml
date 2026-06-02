@@ -100,6 +100,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    environment: product
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -140,6 +141,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    environment: product
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -181,6 +183,7 @@ jobs:
       - build-backend
     if: always() && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
+    environment: product
     steps:
       - name: Deploy selected services
         uses: appleboy/ssh-action@v1.2.0
