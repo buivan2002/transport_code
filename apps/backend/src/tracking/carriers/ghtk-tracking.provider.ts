@@ -155,7 +155,7 @@ export class GhtkTrackingProvider implements CarrierStrategy {
   }
 
   private getStatusText(status: TrackingStatus): string {
-    const map: Record<TrackingStatus, string> = {
+    const map: Partial<Record<TrackingStatus, string>> = {
       [TrackingStatus.CREATED]: 'Đã tạo đơn',
       [TrackingStatus.PICKED_UP]: 'Đã lấy hàng',
       [TrackingStatus.IN_TRANSIT]: 'Đang vận chuyển',
@@ -168,7 +168,7 @@ export class GhtkTrackingProvider implements CarrierStrategy {
       [TrackingStatus.UNKNOWN]: 'Không xác định',
     };
 
-    return map[status];
+    return map[status] ?? 'Khong xac dinh';
   }
 
   private getMockTracking(trackingCode: string): RawGhtkTracking {

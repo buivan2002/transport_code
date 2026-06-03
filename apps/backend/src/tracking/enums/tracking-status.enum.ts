@@ -1,4 +1,6 @@
 export enum TrackingStatus {
+  PENDING = 'pending',
+  INFO_RECEIVED = 'info_received',
   CREATED = 'created',
   PICKED_UP = 'picked_up',
   IN_TRANSIT = 'in_transit',
@@ -8,5 +10,6 @@ export enum TrackingStatus {
   RETURNING = 'returning',
   RETURNED = 'returned',
   CANCELLED = 'cancelled',
+  NOT_FOUND = 'not_found',
   UNKNOWN = 'unknown',
 }

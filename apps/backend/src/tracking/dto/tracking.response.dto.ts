@@ -18,5 +18,7 @@ export class TrackingResponseDto {
   currentLocation?: string;
   estimatedDeliveryTime?: string;
   lastUpdatedAt?: string;
+  source?: string;
+  cached?: boolean;
   history!: TrackingHistoryItemDto[];
 }
