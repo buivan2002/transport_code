@@ -25,6 +25,7 @@ ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/apps/frontend/.next/standalone ./
 COPY --from=builder /app/apps/frontend/.next/static ./apps/frontend/.next/static
+COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
 COPY --from=builder /app/apps/frontend/package.json ./apps/frontend/package.json
 
 EXPOSE 3000
