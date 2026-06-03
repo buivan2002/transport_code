@@ -1,9 +1,13 @@
 import { CarrierOption, TrackingResponse } from '@/types/tracking';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4002';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
+
+function apiUrl(path: string) {
+  return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+}
 
 export async function getCarriers(): Promise<CarrierOption[]> {
-  const response = await fetch(`${API_BASE_URL}/tracking/carriers`);
+  const response = await fetch(apiUrl('/tracking/carriers'));
 
   if (!response.ok) {
     throw new Error('Không thể tải danh sách nhà vận chuyển');
@@ -16,7 +20,7 @@ export async function searchTracking(input: {
   carrier: string;
   trackingCode: string;
 }): Promise<TrackingResponse> {
-  const response = await fetch(`${API_BASE_URL}/tracking/search`, {
+  const response = await fetch(apiUrl('/tracking/search'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

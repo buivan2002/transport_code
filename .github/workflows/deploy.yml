@@ -12,15 +12,6 @@ permissions:
 env:
   FRONTEND_IMAGE_NAME: transport-express-frontend
   BACKEND_IMAGE_NAME: transport-express-backend
-  FRONTEND_PUBLIC_API_BASE_URL: ${{ secrets.FRONTEND_PUBLIC_API_BASE_URL }}
-  VPS_APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/transport-express' }}
-  FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '4000' }}
-  BACKEND_PORT: ${{ vars.BACKEND_PORT || '4002' }}
-  FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
-  CARRIER_API_TIMEOUT_MS: ${{ vars.CARRIER_API_TIMEOUT_MS || '5000' }}
-  GHTK_ENABLED: ${{ vars.GHTK_ENABLED || 'true' }}
-  GHTK_MOCK_MODE: ${{ vars.GHTK_MOCK_MODE || 'true' }}
-  GHTK_API_BASE_URL: ${{ vars.GHTK_API_BASE_URL || 'https://partner-api.example.com/ghtk' }}
 
 jobs:
   changes:
@@ -129,7 +120,7 @@ jobs:
           file: apps/frontend/Dockerfile
           push: true
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ env.FRONTEND_PUBLIC_API_BASE_URL }}
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://api-transport.qanh.site' }}
           tags: |
             ${{ steps.image.outputs.name }}:latest
             ${{ steps.image.outputs.name }}:${{ github.sha }}
@@ -185,36 +176,50 @@ jobs:
     runs-on: ubuntu-latest
     environment: product
     steps:
+      - name: Validate deploy config
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD || vars.VPS_PASSWORD }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          missing=false
+
+          for name in VPS_HOST VPS_USER VPS_PASSWORD GHCR_USERNAME GHCR_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is missing in the product Environment."
+              missing=true
+            fi
+          done
+
+          if [ "$missing" = true ]; then
+            exit 1
+          fi
+
       - name: Deploy selected services
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ vars.VPS_HOST }}
-          username: ${{ vars.VPS_USER }}
-          password: ${{ vars.VPS_PASSWORD }}
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD || vars.VPS_PASSWORD }}
           port: ${{ vars.VPS_SSH_PORT || '22' }}
           script: |
             set -e
 
-            APP_DIR="${{ env.VPS_APP_DIR }}"
-            FRONTEND_PORT="${{ env.FRONTEND_PORT }}"
-            BACKEND_PORT="${{ env.BACKEND_PORT }}"
-            FRONTEND_ORIGIN="${{ env.FRONTEND_ORIGIN }}"
-            FRONTEND_PUBLIC_API_BASE_URL="${{ env.FRONTEND_PUBLIC_API_BASE_URL }}"
-            CARRIER_API_TIMEOUT_MS="${{ env.CARRIER_API_TIMEOUT_MS }}"
-            GHTK_ENABLED="${{ env.GHTK_ENABLED }}"
-            GHTK_MOCK_MODE="${{ env.GHTK_MOCK_MODE }}"
-            GHTK_API_BASE_URL="${{ env.GHTK_API_BASE_URL }}"
+            APP_DIR="${{ vars.VPS_APP_DIR || '/opt/transport-express' }}"
+            FRONTEND_PORT="${{ vars.FRONTEND_PORT || '4001' }}"
+            BACKEND_PORT="${{ vars.BACKEND_PORT || '4002' }}"
+            FRONTEND_ORIGIN="${{ vars.FRONTEND_ORIGIN || 'https://transport.qanh.site' }}"
+            CARRIER_API_TIMEOUT_MS="${{ vars.CARRIER_API_TIMEOUT_MS || '5000' }}"
+            GHTK_ENABLED="${{ vars.GHTK_ENABLED || 'true' }}"
+            GHTK_MOCK_MODE="${{ vars.GHTK_MOCK_MODE || 'true' }}"
+            GHTK_API_BASE_URL="${{ vars.GHTK_API_BASE_URL || 'https://partner-api.example.com/ghtk' }}"
             GHTK_API_TOKEN="${{ secrets.GHTK_API_TOKEN }}"
 
-            [ -z "$APP_DIR" ] && APP_DIR="/opt/transport-express"
-            [ -z "$FRONTEND_PORT" ] && FRONTEND_PORT="4000"
-            [ -z "$BACKEND_PORT" ] && BACKEND_PORT="4002"
-            [ -z "$FRONTEND_ORIGIN" ] && FRONTEND_ORIGIN="http://localhost:$FRONTEND_PORT"
-            [ -z "$FRONTEND_PUBLIC_API_BASE_URL" ] && FRONTEND_PUBLIC_API_BASE_URL="http://localhost:$BACKEND_PORT"
-            [ -z "$CARRIER_API_TIMEOUT_MS" ] && CARRIER_API_TIMEOUT_MS="5000"
-            [ -z "$GHTK_ENABLED" ] && GHTK_ENABLED="true"
-            [ -z "$GHTK_MOCK_MODE" ] && GHTK_MOCK_MODE="true"
-            [ -z "$GHTK_API_BASE_URL" ] && GHTK_API_BASE_URL="https://partner-api.example.com/ghtk"
             [ -z "$GHTK_API_TOKEN" ] && GHTK_API_TOKEN="replace_me"
 
             OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
@@ -230,18 +235,26 @@ jobs:
                 container_name: transport-express-backend
                 restart: unless-stopped
                 ports:
-                  - "${BACKEND_PORT:-4002}:4002"
+                  - "127.0.0.1:${BACKEND_PORT:-4002}:4002"
                 env_file:
                   - ./backend.env
+                networks:
+                  - transport-express
 
               frontend:
                 image: ${FRONTEND_IMAGE}
                 container_name: transport-express-frontend
                 restart: unless-stopped
                 ports:
-                  - "${FRONTEND_PORT:-4000}:3000"
+                  - "127.0.0.1:${FRONTEND_PORT:-4001}:3000"
                 depends_on:
                   - backend
+                networks:
+                  - transport-express
+
+            networks:
+              transport-express:
+                name: transport-express
             EOF
 
             cat > "$APP_DIR/.env" <<EOF
@@ -262,7 +275,7 @@ jobs:
             GHTK_API_TOKEN=$GHTK_API_TOKEN
             EOF
 
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ vars.GHCR_USERNAME }}" --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}" --password-stdin
 
             cd "$APP_DIR"
 

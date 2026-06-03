@@ -4,15 +4,23 @@ services:
     container_name: transport-express-backend
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-4002}:4002"
+      - "127.0.0.1:${BACKEND_PORT:-4002}:4002"
     env_file:
       - ./backend.env
+    networks:
+      - transport-express
 
   frontend:
     image: ${FRONTEND_IMAGE}
     container_name: transport-express-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-4000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-4001}:3000"
     depends_on:
       - backend
+    networks:
+      - transport-express
+
+networks:
+  transport-express:
+    name: transport-express

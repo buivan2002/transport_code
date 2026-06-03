@@ -1,51 +1,58 @@
 # CI/CD Deployment
 
-## Runtime Ports
+## Environment Split
 
-- Frontend container listens on `3000`.
-- Frontend is exposed on VPS by `FRONTEND_PORT`, default `4000`.
-- Backend container listens on `4002`.
-- Backend is exposed on VPS by `BACKEND_PORT`, default `4002`.
-
-Example public URLs:
+Development:
 
 ```txt
-Frontend: http://YOUR_VPS_IP:4000
-Backend:  http://YOUR_VPS_IP:4002
+Frontend: http://localhost:4000
+Backend:  http://localhost:4002
 ```
 
-## GitHub Actions Flow
-
-Workflow file:
+Production:
 
 ```txt
-.github/workflows/deploy.yml
+Frontend: https://transport.qanh.site
+Backend:  https://api-transport.qanh.site
 ```
 
-Deploy rule:
+## Production Network
 
-- Changed files under `apps/frontend/**`: build and deploy frontend only.
-- Changed files under `apps/backend/**`: build and deploy backend only.
-- Changed files outside `apps/**`: build and deploy both.
-
-Images are pushed to GitHub Container Registry:
+Nginx terminates SSL and proxies to local Docker-published ports:
 
 ```txt
-ghcr.io/<github-owner>/transport-express-frontend:latest
-ghcr.io/<github-owner>/transport-express-backend:latest
+transport.qanh.site
+  -> Nginx :443
+  -> 127.0.0.1:4001
+  -> frontend container :3000
+
+api-transport.qanh.site
+  -> Nginx :443
+  -> 127.0.0.1:4002
+  -> backend container :4002
 ```
 
-## GitHub Secrets And Variables
+Docker ports are bound to `127.0.0.1`, so they are not directly reachable from the public internet by `VPS_IP:4001` or `VPS_IP:4002`.
 
-Go to:
+Backend outbound internet remains open through Docker's default networking, so it can call carrier APIs.
+
+## GitHub Environment
+
+The workflow uses:
+
+```yml
+environment: product
+```
+
+Create it here:
 
 ```txt
-GitHub repo -> Settings -> Secrets and variables -> Actions
+GitHub repo -> Settings -> Environments -> product
 ```
 
-Use repository-level Secrets/Variables only. This workflow does not use GitHub Environments.
+## Product Secrets
 
-Required repository secrets:
+Add these in Environment `product` -> Secrets:
 
 ```txt
 VPS_HOST=your.vps.ip.or.domain
@@ -53,79 +60,100 @@ VPS_USER=root
 VPS_PASSWORD=your-vps-ssh-password
 GHCR_USERNAME=your-github-username
 GHCR_TOKEN=github personal access token with read:packages
-FRONTEND_PUBLIC_API_BASE_URL=http://your.vps.ip:4002
 GHTK_API_TOKEN=replace_me
 ```
 
-Required repository variables:
+`VPS_HOST`, `VPS_USER`, `VPS_PASSWORD`, and `GHCR_USERNAME` may also be Environment variables, but secrets are safer.
+
+## Product Variables
+
+Add these in Environment `product` -> Variables:
 
 ```txt
-FRONTEND_ORIGIN=http://your.vps.ip:4000
-```
-
-Optional repository variables:
-
-```txt
+NEXT_PUBLIC_API_BASE_URL=https://api-transport.qanh.site
 VPS_SSH_PORT=22
 VPS_APP_DIR=/opt/transport-express
-FRONTEND_PORT=4000
+FRONTEND_PORT=4001
 BACKEND_PORT=4002
+FRONTEND_ORIGIN=https://transport.qanh.site
 CARRIER_API_TIMEOUT_MS=5000
 GHTK_ENABLED=true
 GHTK_MOCK_MODE=true
 GHTK_API_BASE_URL=https://partner-api.example.com/ghtk
 ```
 
-## GHCR Token
+## Local Env Files
 
-Create a GitHub Personal Access Token:
-
-```txt
-GitHub -> Settings -> Developer settings -> Personal access tokens
-```
-
-For the VPS to pull images from GHCR, the token needs:
+Backend local:
 
 ```txt
-read:packages
+apps/backend/.env
 ```
 
-If your package is private, keep this token as `GHCR_TOKEN`.
-
-The workflow itself pushes images with `GITHUB_TOKEN`, so `GHCR_TOKEN` is only for the VPS pull step.
-
-## VPS Prerequisites
-
-Install Docker and Docker Compose plugin on the VPS.
-
-Check:
-
-```bash
-docker --version
-docker compose version
+```env
+PORT=4002
+FRONTEND_ORIGIN=http://localhost:4000
 ```
 
-Make sure the VPS firewall allows:
+Frontend local:
 
 ```txt
-4000/tcp for frontend
-4002/tcp for backend
+apps/frontend/.env
 ```
 
-The workflow creates these files on the VPS automatically:
-
-```txt
-/opt/transport-express/docker-compose.prod.yml
-/opt/transport-express/.env
-/opt/transport-express/backend.env
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4002
 ```
 
-## Manual Deploy From VPS
+## Nginx Example
 
-After the first GitHub Actions deploy, you can manually restart:
+```nginx
+server {
+    listen 80;
+    server_name transport.qanh.site api-transport.qanh.site;
+    return 301 https://$host$request_uri;
+}
 
-```bash
-cd /opt/transport-express
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+server {
+    listen 443 ssl http2;
+    server_name transport.qanh.site;
+
+    ssl_certificate /etc/letsencrypt/live/transport.qanh.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/transport.qanh.site/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:4001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api-transport.qanh.site;
+
+    ssl_certificate /etc/letsencrypt/live/api-transport.qanh.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api-transport.qanh.site/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:4002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
+
+## Deploy Rule
+
+- Change under `apps/frontend/**`: build/deploy frontend only.
+- Change under `apps/backend/**`: build/deploy backend only.
+- Change outside `apps/**`: build/deploy both.
+- Force push fallback: if diff base is unclear, build/deploy both.
