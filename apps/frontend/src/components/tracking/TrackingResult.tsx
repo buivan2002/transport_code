@@ -1,45 +1,82 @@
-import { TrackingResponse } from '@/types/tracking';
+import { TrackingResponse, TrackingStatus } from '@/types/tracking';
 
 type Props = {
   result: TrackingResponse;
 };
 
+const STATUS_CLASS: Record<TrackingStatus, string> = {
+  created: 'status-neutral',
+  picked_up: 'status-info',
+  in_transit: 'status-warning',
+  out_for_delivery: 'status-warning',
+  delivered: 'status-success',
+  delivery_failed: 'status-danger',
+  returning: 'status-danger',
+  returned: 'status-neutral',
+  cancelled: 'status-danger',
+  unknown: 'status-neutral',
+};
+
 export function TrackingResult({ result }: Props) {
   return (
-    <section className="mt-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="text-sm text-slate-500">{result.carrierName}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          <h2 className="text-2xl font-semibold">{result.trackingCode}</h2>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-            {result.statusText}
-          </span>
+    <section className="result-section" aria-label="Kết quả tra cứu">
+      <div className="result-summary">
+        <div>
+          <p className="panel-kicker">{result.carrierName}</p>
+          <div className="result-title-row">
+            <h2>{result.trackingCode}</h2>
+            <span className={`status-badge ${STATUS_CLASS[result.status]}`}>
+              {result.statusText}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-          {result.currentLocation && <div>Vị trí hiện tại: {result.currentLocation}</div>}
-          {result.estimatedDeliveryTime && (
-            <div>Dự kiến giao: {formatDate(result.estimatedDeliveryTime)}</div>
+        <dl className="result-meta">
+          {result.currentLocation && (
+            <div>
+              <dt>Vị trí hiện tại</dt>
+              <dd>{result.currentLocation}</dd>
+            </div>
           )}
-          {result.lastUpdatedAt && <div>Cập nhật lúc: {formatDate(result.lastUpdatedAt)}</div>}
-        </div>
+          {result.estimatedDeliveryTime && (
+            <div>
+              <dt>Dự kiến giao</dt>
+              <dd>{formatDate(result.estimatedDeliveryTime)}</dd>
+            </div>
+          )}
+          {result.lastUpdatedAt && (
+            <div>
+              <dt>Cập nhật lúc</dt>
+              <dd>{formatDate(result.lastUpdatedAt)}</dd>
+            </div>
+          )}
+        </dl>
       </div>
 
-      <ol className="mt-5 space-y-4">
-        {result.history.map((item, index) => (
-          <li
-            key={`${item.time}-${index}`}
-            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="text-sm text-slate-500">{formatDate(item.time)}</div>
-            <div className="mt-1 font-medium">{item.statusText}</div>
-            {item.location && <div className="mt-1 text-sm text-slate-600">{item.location}</div>}
-            {item.description && (
-              <div className="mt-1 text-sm text-slate-600">{item.description}</div>
-            )}
-          </li>
-        ))}
-      </ol>
+      <div className="timeline-panel">
+        <div className="timeline-heading">
+          <h3>Lịch sử vận chuyển</h3>
+          <span>{result.history.length} cập nhật</span>
+        </div>
+
+        {result.history.length > 0 ? (
+          <ol className="timeline">
+            {result.history.map((item, index) => (
+              <li key={`${item.time}-${index}`} className="timeline-item">
+                <span className="timeline-dot" aria-hidden="true" />
+                <div className="timeline-content">
+                  <time>{formatDate(item.time)}</time>
+                  <strong>{item.statusText}</strong>
+                  {item.location && <p>{item.location}</p>}
+                  {item.description && <p>{item.description}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="empty-state">Chưa có lịch sử vận chuyển cho mã này.</div>
+        )}
+      </div>
     </section>
   );
 }

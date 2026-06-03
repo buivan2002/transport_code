@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Transport Express',
-  description: 'Tra cứu mã vận đơn trong nước',
+  description: 'Tra cứu mã vận đơn và nhà vận chuyển',
 };
 
 export default function RootLayout({
