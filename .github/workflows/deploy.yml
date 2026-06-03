@@ -234,27 +234,32 @@ jobs:
                 image: ${BACKEND_IMAGE}
                 container_name: transport-express-backend
                 restart: unless-stopped
-                ports:
-                  - "127.0.0.1:${BACKEND_PORT:-4002}:4002"
+                expose:
+                  - "4002"
                 env_file:
                   - ./backend.env
                 networks:
                   - transport-express
+                  - proxy-network
 
               frontend:
                 image: ${FRONTEND_IMAGE}
                 container_name: transport-express-frontend
                 restart: unless-stopped
-                ports:
-                  - "127.0.0.1:${FRONTEND_PORT:-4001}:3000"
+                expose:
+                  - "3000"
                 depends_on:
                   - backend
                 networks:
                   - transport-express
+                  - proxy-network
 
             networks:
               transport-express:
                 name: transport-express
+
+              proxy-network:
+                external: true
             EOF
 
             cat > "$APP_DIR/.env" <<EOF
