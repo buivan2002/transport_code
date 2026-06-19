@@ -8,7 +8,10 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.enableCors({
-    origin: config.get<string>('FRONTEND_ORIGIN', 'http://localhost:4000', 'https://daiphatmkt.com'),
+    origin: [
+      config.get<string>('FRONTEND_ORIGIN', 'http://localhost:4000'), 
+      'https://daiphatmkt.com'
+    ],
     credentials: true,
   });
 
